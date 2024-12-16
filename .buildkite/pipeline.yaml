@@ -1,0 +1,38 @@
+steps:
+  # Run some pre-build tools maybe.
+  # - block: "Get image URL"  
+  #   fields:
+  #     - text: "Image URL"
+  #       key: "image_url"
+  #       required: true
+  #   blocked_state: "failed"
+        
+  - key: "test_manual_input-build_project"
+    label: ":building_construction: Build project"
+    commands: 
+      - "cd hello"
+      - "go build -o hello"
+    artifact_paths:
+      - "hello/hello"
+    plugins:
+      - docker#v5.12.0:
+          image: packages.buildkite.com/new-millenium/docker-registry/golang:1.18.0/ $
+          #image: "golang:1.18.0"
+
+  - block: ":wood: Get input"
+    key: "test_manual_input-get_input"
+    prompt: "Enter your name"
+    fields: 
+      - text: "Your name"
+        key: "users_name"
+        required: true 
+    depends_on: "test_manual_input-build_project"
+    blocked_state: "running"
+
+  - label: ':wave: Run'
+    key: 'test_manual_input-run'
+    command:
+      - buildkite-agent artifact download hello/hello . --step test_manual_input-build_project
+      - chmod +x ./hello/hello
+      - ./hello/hello $(buildkite-agent meta-data get "users_name")
+    depends_on: "test_manual_input-get_input"
