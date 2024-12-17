@@ -1,38 +1,67 @@
 steps:
-  # Run some pre-build tools maybe.
-  # - block: "Get image URL"  
-  #   fields:
-  #     - text: "Image URL"
-  #       key: "image_url"
-  #       required: true
-  #   blocked_state: "failed"
-        
-  - key: "test_manual_input-build_project"
-    label: ":building_construction: Build project"
-    commands: 
-      - "cd hello"
-      - "go build -o hello"
-    artifact_paths:
-      - "hello/hello"
-    plugins:
-      - docker#v5.12.0:
-          image: packages.buildkite.com/new-millenium/docker-registry/golang:1.18.0/ $
-          #image: "golang:1.18.0"
+  - group: ":mag: QA: Static Checks"
+    id: "hello-qa"
+    steps:
+      - label: ":golang: go vet"
+        key: "hello-qa-static_checks-vet"
+        command: 
+          - "go vet ./..."
+        plugins:
+          - docker-login#v3.0.0:
+              server: "packages.buildkite.com"
+              username: "buildkite"
+              password-env: TOKEN_READ_PACKAGES
+          - docker#v5.12.0:
+              image: "packages.buildkite.com/new-millenium/docker-registry/golang:1.18.0"
+      - label: ":golang: test"
+        key: "hello-qa-static_checks-coverage"
+        command: 
+          - "go test -v -count=1 -cover ./... -coverprofile=coverage.txt -covermode=atomic"
+        artifact_paths:
+          - "coverage.txt" # upload the coverage report as an artifact
+        plugins:
+          - docker-login#v3.0.0:
+              server: "packages.buildkite.com"
+              username: "buildkite"
+              password-env: TOKEN_READ_PACKAGES
+          - docker#v5.12.0:
+              image: "packages.buildkite.com/new-millenium/docker-registry/golang:1.18.0"
+  # - group: ":mag: QA: Security Analysis"
+  #   steps:
+  #     - command: ""
+  - group: ":bento: Compilation"
+    steps:
+      - key: "hello-build_project"
+        label: ":building_construction: Build project"
+        commands: 
+          - "cd hello"
+          - "go build -o hello"
+        artifact_paths:
+          - "hello/hello"
+        plugins:
+          - docker-login#v3.0.0:
+              server: "packages.buildkite.com"
+              username: "buildkite"
+              password-env: TOKEN_READ_PACKAGES
+          - docker#v5.12.0:
+              image: "packages.buildkite.com/new-millenium/docker-registry/golang:1.18.0"
+  - wait: ~
+  - group: ":cookie: Run build"
+    key: "hello-run_build"
+    steps:
+      - block: ":wood: Provide runtime inputs"
+        key: "hello-run_build-runtime_inputs"
+        prompt: "Enter your name"
+        fields: 
+          - text: "Your name"
+            key: "hello-run_build-runtime_inputs-users_name"
+            required: true 
+        blocked_state: "running"
 
-  - block: ":wood: Get input"
-    key: "test_manual_input-get_input"
-    prompt: "Enter your name"
-    fields: 
-      - text: "Your name"
-        key: "users_name"
-        required: true 
-    depends_on: "test_manual_input-build_project"
-    blocked_state: "running"
-
-  - label: ':wave: Run'
-    key: 'test_manual_input-run'
-    command:
-      - buildkite-agent artifact download hello/hello . --step test_manual_input-build_project
-      - chmod +x ./hello/hello
-      - ./hello/hello $(buildkite-agent meta-data get "users_name")
-    depends_on: "test_manual_input-get_input"
+      - label: ':wave: Run'
+        key: 'hello-run_build-run'
+        command:
+          - buildkite-agent artifact download hello/hello . --step hello-build_project
+          - chmod +x ./hello/hello
+          - ./hello/hello $(buildkite-agent meta-data get "hello-run_build-runtime_inputs-users_name")
+        # depends_on: "hello-get_input"

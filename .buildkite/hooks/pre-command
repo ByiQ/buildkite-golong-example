@@ -2,6 +2,8 @@
 set -euo pipefail
 
 # Create the environment variable that needs to be uploaded
+
+# Store API token for reading packages from the Docker registry.
 TOKEN_READ_PACKAGES=$(buildkite-agent secret get TOKEN_READ_PACKAGES)
 
 # export created environment variables (we do this separately, see: https://github.com/koalaman/shellcheck/wiki/SC2155)
